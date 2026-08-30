@@ -1,0 +1,78 @@
+{
+  "L5_1_ch02": {
+    "class_agreement": 1.0,
+    "f1_max_diff": 2.9689005587307804e-08,
+    "coverages": {
+      "spsr": 0.19514973958333334,
+      "subpsr": 0.010009765625,
+      "psr": 0.20515950520833334,
+      "continuous": 0.2504611545138889
+    },
+    "coverages_ok": true
+  },
+  "L5_2_ch05": {
+    "suitability_max_diff": 3.950430405019745e-08,
+    "suitability_file_max_diff": 5.960464477539063e-08,
+    "class_agreement": 1.0,
+    "class_agreement_file": 1.0,
+    "mask_equal": true,
+    "mask_pixels": 80749,
+    "argmax_xy": [
+      44760.0,
+      10920.0
+    ],
+    "argmax_ok": true,
+    "grade_i_points": 16022,
+    "grade_i_legacy_doc": 5214,
+    "grade_i_note": "历史文档 5,214 为 2026-08-03 P0 修复时代早期迭代计数，其底层 suitability 未归档；最终存档迭代（输入.udbx）最高 Jenks 级含 16,022 像元。差异已登记（验证报告 §L5.2），不属本次重构引入。"
+  },
+  "failures": [],
+  "L5_3_endtoend": {
+    "path": {
+      "length_km": 4.028646824195704,
+      "vertices": 17,
+      "crossings": 0,
+      "ok": true
+    },
+    "energy": {
+      "min_soc": 210.8,
+      "min_soc_at_km": 2.5,
+      "dwell": 3,
+      "lunar_days": 5,
+      "ok": true,
+      "match_L3": true
+    },
+    "manifest": {
+      "stages": 14,
+      "bad": {},
+      "ok": true
+    },
+    "L1_metrics": {
+      "failures": [],
+      "registered": []
+    },
+    "L2_metrics": {
+      "failures": [],
+      "registered": []
+    },
+    "L3_metrics": {
+      "failures": [],
+      "registered": [
+        "交付剖面（双线性）-驻留充电次数",
+        "交付剖面（双线性）-单程月昼数"
+      ]
+    },
+    "L4_metrics": {
+      "failures": [],
+      "registered": []
+    },
+    "ch05_argmax": {
+      "xy": [
+        44760.0,
+        10920.0
+      ],
+      "ok": true
+    },
+    "failures": []
+  }
+}

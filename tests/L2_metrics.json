@@ -1,0 +1,28 @@
+{
+  "task_path": {
+    "raw_chain_n": 17,
+    "raw_fold_km": 4.038822509939085,
+    "degree": 5,
+    "s": 0.0,
+    "vertices": 17,
+    "length_km": 4.028650528247988,
+    "straight_km": 3.84,
+    "detour_ratio": 1.0491277417312468,
+    "crossings": 0,
+    "profile_n": 82,
+    "check_points": 136
+  },
+  "geo_path": {
+    "raw_chain_n": 247,
+    "raw_fold_km": 68.9811254969542,
+    "degree": 2,
+    "s": 5000000.0,
+    "vertices": 247,
+    "length_km": 65.55795700865812,
+    "pathjson_km": 65.29473433508656,
+    "pathjson_vertices": 264,
+    "pathjson_dup_vertices": 43,
+    "crossings": 0
+  },
+  "failures": []
+}

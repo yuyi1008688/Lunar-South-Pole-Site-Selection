@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>月球南极选址 · 数字孪生</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { overflow:hidden; background:#000; font-family:'Microsoft YaHei',sans-serif; }
+canvas { display:block; }
+#ui {
+  position:fixed; top:15px; left:15px; z-index:10;
+  background:rgba(0,0,0,0.75); color:#fff; padding:15px 20px;
+  border-radius:8px; border:1px solid rgba(0,212,255,0.3);
+  font-size:14px; max-width:360px;
+}
+#ui h1 { font-size:18px; color:#00D4FF; margin-bottom:6px; }
+#ui p { font-size:12px; color:#aaa; margin:2px 0; }
+#ui .legend { margin-top:8px; }
+#ui .legend-item { display:flex; align-items:center; margin:4px 0; font-size:12px; }
+#ui .legend-color { width:18px; height:12px; margin-right:8px; border:1px solid #555; border-radius:2px; }
+#phase {
+  position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+  z-index:10; background:rgba(0,0,0,0.8); color:#00D4FF;
+  padding:12px 30px; border-radius:25px; font-size:16px;
+  border:1px solid rgba(0,212,255,0.3);
+}
+#btn-fly {
+  position:fixed; top:15px; right:15px; z-index:10;
+  background:linear-gradient(135deg,#00D4FF,#0099CC); color:#fff;
+  border:none; padding:12px 28px; border-radius:25px;
+  cursor:pointer; font-size:15px; font-weight:bold;
+  box-shadow:0 0 20px rgba(0,212,255,0.5); transition:all 0.3s;
+}
+#btn-fly:hover { box-shadow:0 0 40px rgba(0,212,255,0.8); transform:scale(1.05); }
+#loading {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:20; color:#00D4FF; font-size:22px;
+}
+</style>
+</head>
+<body>
+<div id="loading">加载月球数据中...</div>
+<div id="ui" style="display:none;">
+  <h1>月球南极 Shackleton 选址</h1>
+  <p>384×384 @ 240m | 92km×92km | 高程夸张×3</p>
+  <p>追光 → 找冰 → 选点 → 走通</p>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color" style="background:cyan;opacity:0.4;"></div><span>PSR永久阴影区</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:linear-gradient(90deg,#ADD8E6,#000080);"></div><span>水冰体元栅格（地下）</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:linear-gradient(90deg,red,gold);"></div><span>I级选址点(5214)</span></div>
+    <div class="legend-item"><div class="legend-color" style="background:#FF5000;"></div><span>最优巡视路径</span></div>
+  </div>
+</div>
+<button id="btn-fly" style="display:none;" onclick="startFlythrough()">▶ 开始飞行漫游</button>
+<div id="phase" style="display:none;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let scene, camera, renderer;
+let earth, moon, rocket;
+let terrainMesh, psrMesh, pointSystem, pathLine;
+let iceVoxels = [];
+let starField;
+let phaseLabel = document.getElementById('phase');
+let uiLabel = document.getElementById('ui');
+let btnFly = document.getElementById('btn-fly');
+let isLoading = true;
+
+async function loadData(url) { const r = await fetch(url); return r.json(); }
+async function loadTexture(url) { return new Promise(r => new THREE.TextureLoader().load(url, r)); }
+
+// 颜色工具
+function iceColor(val, maxVal) {
+  const t = val / maxVal;
+  const r = Math.floor(173 * (1-t) + 0 * t);
+  const g = Math.floor(216 * (1-t) + 0 * t);
+  const b = Math.floor(230 * (1-t) + 128 * t);
+  return (r << 16) | (g << 8) | b;
+}
+
+function scoreColor(score) {
+  if (score > 0.55) return 0xFFD700;
+  if (score > 0.40) return 0xFF8C00;
+  return 0xFF6464;
+}
+
+async function init() {
+  // ===== 加载数据 =====
+  const demData = await loadData('dem.json');
+  const pointsData = await loadData('points.json');
+  const pathData = await loadData('path.json');
+  const iceData = await loadData('ice_voxels.json');
+  const demTex = await loadTexture('dem_texture.png');
+  const psrTex = await loadTexture('psr_texture.png');
+  const illumTex = await loadTexture('illumination_texture.png');
+
+  // ===== 场景 =====
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000011, 0.000006);
+
+  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 100, 1000000);
+  camera.position.set(0, -80000, 60000);
+  camera.lookAt(0, 0, 0);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setClearColor(0x000000);
+  document.body.appendChild(renderer.domElement);
+
+  // ===== 光照 =====
+  scene.add(new THREE.AmbientLight(0x303060, 0.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.position.set(30000, 30000, 15000);
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x4444aa, 0x000022, 0.3));
+
+  // ===== 星空 =====
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(5000 * 3);
+  for (let i = 0; i < 5000; i++) {
+    const r = 200000 + Math.random() * 300000;
+    const t = Math.random() * Math.PI * 2;
+    const p = Math.acos(Math.random() * 2 - 1);
+    starPos[i*3] = r * Math.sin(p) * Math.cos(t);
+    starPos[i*3+1] = r * Math.sin(p) * Math.sin(t);
+    starPos[i*3+2] = r * Math.cos(p);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ color:0xffffff, size:200, sizeAttenuation:true }));
+  scene.add(starField);
+
+  // ===== 地球（远景） =====
+  const earthGeo = new THREE.SphereGeometry(15000, 32, 32);
+  const earthMat = new THREE.MeshPhongMaterial({ color:0x2266AA, emissive:0x001144, shininess:30 });
+  earth = new THREE.Mesh(earthGeo, earthMat);
+  earth.position.set(-120000, 0, 40000);
+  scene.add(earth);
+
+  // 大气层光晕
+  const atmoGeo = new THREE.SphereGeometry(15500, 32, 32);
+  const atmoMat = new THREE.MeshBasicMaterial({ color:0x4488FF, transparent:true, opacity:0.2, side:THREE.BackSide });
+  scene.add(new THREE.Mesh(atmoGeo, atmoMat)).position.copy(earth.position);
+
+  // ===== 月球地形 =====
+  const W = demData.width, H = demData.height, CS = demData.cellSize;
+  const demArr = demData.data;
+  const geo = new THREE.PlaneGeometry(W * CS, H * CS, W - 1, H - 1);
+  const pos = geo.attributes.position.array;
+  for (let i = 0; i < H; i++)
+    for (let j = 0; j < W; j++)
+      pos[(i * W + j) * 3 + 2] = demArr[i][j];
+  geo.computeVertexNormals();
+
+  terrainMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    map: demTex, color: 0x886644, shininess: 5, specular: 0x111111
+  }));
+  terrainMesh.rotation.x = -Math.PI / 2;
+  scene.add(terrainMesh);
+
+  // 光照分类覆盖
+  const illumMesh = new THREE.Mesh(geo.clone(), new THREE.MeshPhongMaterial({
+    map: illumTex, transparent: true, opacity: 0.3, depthWrite: false
+  }));
+  illumMesh.rotation.x = -Math.PI / 2;
+  illumMesh.position.z = 5;
+  scene.add(illumMesh);
+
+  // PSR覆盖
+  psrMesh = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({
+    map: psrTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+  }));
+  psrMesh.rotation.x = -Math.PI / 2;
+  psrMesh.position.z = 8;
+  scene.add(psrMesh);
+
+  // ===== 水冰体元栅格（地下体素） =====
+  const iceMaxVal = 2.0838;
+  const iceGroup = new THREE.Group();
+  const voxelGeo = new THREE.BoxGeometry(CS * 0.7, CS * 0.7, CS * 0.7);
+  for (let i = 0; i < iceData.length; i++) {
+    const v = iceData[i];
+    const mat = new THREE.MeshPhongMaterial({
+      color: iceColor(v.val, iceMaxVal), transparent: true, opacity: 0.55, depthWrite: false
+    });
+    const m = new THREE.Mesh(voxelGeo, mat);
+    m.position.set(v.x, v.y, v.z);
+    iceGroup.add(m);
+  }
+  iceGroup.rotation.x = -Math.PI / 2;
+  scene.add(iceGroup);
+  iceVoxels = iceGroup;
+
+  // ===== 选址点 =====
+  const ptGeo = new THREE.BufferGeometry();
+  const ptPos = new Float32Array(pointsData.length * 3);
+  const ptCol = new Float32Array(pointsData.length * 3);
+  for (let i = 0; i < pointsData.length; i++) {
+    ptPos[i*3] = pointsData[i].x;
+    ptPos[i*3+1] = pointsData[i].y;
+    ptPos[i*3+2] = pointsData[i].z;
+    const c = scoreColor(pointsData[i].score);
+    ptCol[i*3] = ((c >> 16) & 255) / 255;
+    ptCol[i*3+1] = ((c >> 8) & 255) / 255;
+    ptCol[i*3+2] = (c & 255) / 255;
+  }
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(ptPos, 3));
+  ptGeo.setAttribute('color', new THREE.BufferAttribute(ptCol, 3));
+  pointSystem = new THREE.Points(ptGeo, new THREE.PointsMaterial({ size:300, vertexColors:true, sizeAttenuation:true }));
+  scene.add(pointSystem);
+
+  // ===== 路径线 =====
+  const pathPos = new Float32Array(pathData.length * 3);
+  for (let i = 0; i < pathData.length; i++) {
+    pathPos[i*3] = pathData[i].x;
+    pathPos[i*3+1] = pathData[i].y;
+    pathPos[i*3+2] = pathData[i].z;
+  }
+  const pathGeo = new THREE.BufferGeometry();
+  pathGeo.setAttribute('position', new THREE.BufferAttribute(pathPos, 3));
+  pathLine = new THREE.Line(pathGeo, new THREE.LineBasicMaterial({ color:0xFF5000, linewidth:3 }));
+  scene.add(pathLine);
+
+  // ===== 火箭 =====
+  const rocketGroup = new THREE.Group();
+  const bodyGeo = new THREE.CylinderGeometry(400, 400, 3000, 12);
+  const bodyMat = new THREE.MeshPhongMaterial({ color:0xDDDDDD, shininess:80 });
+  rocketGroup.add(new THREE.Mesh(bodyGeo, bodyMat));
+  const noseGeo = new THREE.ConeGeometry(400, 1500, 12);
+  rocketGroup.add(new THREE.Mesh(noseGeo, bodyMat)).position.y = 2250;
+  const finGeo = new THREE.BoxGeometry(100, 800, 600);
+  for (let a = 0; a < 4; a++) {
+    const fin = new THREE.Mesh(finGeo, new THREE.MeshPhongMaterial({ color:0xFF4400 }));
+    fin.position.set(Math.cos(a * Math.PI / 2) * 400, -1500, Math.sin(a * Math.PI / 2) * 400);
+    fin.rotation.y = a * Math.PI / 2;
+    rocketGroup.add(fin);
+  }
+  rocket = rocketGroup;
+  rocket.visible = false;
+  scene.add(rocket);
+
+  // ===== 相机控制 =====
+  let isDrag = false, px = 0, py = 0;
+  let theta = Math.PI/4, phi = Math.PI/3, radius = 120000;
+  function updateCam() {
+    camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
+    camera.position.y = radius * Math.sin(phi) * Math.sin(theta);
+    camera.position.z = radius * Math.cos(phi);
+    camera.lookAt(0, 0, -2000);
+  }
+  renderer.domElement.addEventListener('mousedown', e => { isDrag = true; px = e.clientX; py = e.clientY; });
+  renderer.domElement.addEventListener('mouseup', () => isDrag = false);
+  renderer.domElement.addEventListener('mousemove', e => {
+    if (!isDrag) return;
+    theta -= (e.clientX - px) * 0.005;
+    phi -= (e.clientY - py) * 0.005;
+    phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi));
+    px = e.clientX; py = e.clientY;
+    if (!isFlying) updateCam();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    radius += e.deltaY * 0.5;
+    radius = Math.max(5000, Math.min(400000, radius));
+    if (!isFlying) updateCam();
+  });
+  updateCam();
+
+  // ===== UI =====
+  document.getElementById('loading').style.display = 'none';
+  uiLabel.style.display = 'block';
+  btnFly.style.display = 'block';
+  isLoading = false;
+  setPhase('鼠标拖拽旋转 | 滚轮缩放 | 点击右上角开始飞行');
+
+  animate();
+  window.addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+}
+
+function setPhase(text) {
+  phaseLabel.style.display = 'block';
+  phaseLabel.textContent = text;
+}
+
+// ===== 飞行动画 =====
+let isFlying = false;
+window.startFlythrough = function() {
+  if (isFlying) return;
+  isFlying = true;
+
+  const phases = [
+    {
+      name: 'Phase 1: 火箭起飞',
+      duration: 5000,
+      init: () => {
+        rocket.visible = true;
+        rocket.position.set(-120000, 0, 40000);
+        earth.visible = true;
+        setPhase('Phase 1: 火箭从地球起飞');
+      },
+      update: (t) => {
+        const eT = 1 - Math.pow(1 - t, 2);
+        rocket.position.x = -120000 + eT * 60000;
+        rocket.position.y = 0;
+        rocket.position.z = 40000 + eT * 20000;
+        camera.position.set(-80000, -20000, 80000);
+        camera.lookAt(rocket.position);
+      }
+    },
+    {
+      name: 'Phase 2: 飞向月球',
+      duration: 6000,
+      init: () => { setPhase('Phase 2: 穿越太空，飞向月球南极'); },
+      update: (t) => {
+        const eT = t * t;
+        rocket.position.x = -60000 + eT * 60000;
+        rocket.position.y = 0 + eT * 30000;
+        rocket.position.z = 60000 - eT * 40000;
+        camera.position.x = -20000 + eT * 40000;
+        camera.position.y = -50000 + eT * 30000;
+        camera.position.z = 80000 - eT * 30000;
+        camera.lookAt(0, 0, 0);
+      }
+    },
+    {
+      name: 'Phase 3: 进入月球轨道',
+      duration: 5000,
+      init: () => {
+        rocket.visible = false;
+        setPhase('Phase 3: 进入月球南极上空');
+      },
+      update: (t) => {
+        const eT = 1 - Math.pow(1 - t, 3);
+        camera.position.x = 80000 - eT * 40000;
+        camera.position.y = 10000 - eT * 20000;
+        camera.position.z = 50000 - eT * 20000;
+        camera.lookAt(0, 0, -2000);
+      }
+    },
+    {
+      name: 'Phase 4: 俯瞰地形',
+      duration: 5000,
+      init: () => { setPhase('Phase 4: 俯瞰 Shackleton 环形山'); },
+      update: (t) => {
+        camera.position.x = 40000 - t * 35000;
+        camera.position.y = -10000 - t * 5000;
+        camera.position.z = 30000 - t * 15000;
+        camera.lookAt(0, 0, -2000);
+      }
+    },
+    {
+      name: 'Phase 5: 发现水冰',
+      duration: 6000,
+      init: () => {
+        iceVoxels.visible = true;
+        setPhase('Phase 5: 地下水冰体元栅格（蓝色体素）');
+      },
+      update: (t) => {
+        camera.position.x = 5000 + Math.sin(t * Math.PI) * 10000;
+        camera.position.y = -15000;
+        camera.position.z = 15000 - t * 5000;
+        camera.lookAt(0, 0, -3000);
+      }
+    },
+    {
+      name: 'Phase 6: 选址点群',
+      duration: 5000,
+      init: () => { setPhase('Phase 6: I级选址点分布（5214个点）'); },
+      update: (t) => {
+        camera.position.x = 8000 + t * 5000;
+        camera.position.y = -5000 + t * 3000;
+        camera.position.z = 10000 - t * 2000;
+        camera.lookAt(5000, 0, -2000);
+      }
+    },
+    {
+      name: 'Phase 7: 巡视器路径',
+      duration: 6000,
+      init: () => { setPhase('Phase 7: 最优巡视器路径规划'); },
+      update: (t) => {
+        const idx = Math.floor(t * (pathData ? pathData.length - 1 : 0));
+        camera.position.x = 15000;
+        camera.position.y = -5000;
+        camera.position.z = 8000;
+        if (window._pathData) {
+          const p = window._pathData[Math.min(idx, window._pathData.length - 1)];
+          camera.lookAt(p.x, p.y, p.z);
+        }
+      }
+    },
+    {
+      name: 'Phase 8: 拉远收尾',
+      duration: 5000,
+      init: () => { setPhase('Phase 8: 拉远收尾，展示全貌'); },
+      update: (t) => {
+        const eT = t * t;
+        camera.position.x = 15000 + eT * 65000;
+        camera.position.y = -5000 + eT * 5000;
+        camera.position.z = 8000 + eT * 52000;
+        camera.lookAt(0, 0, -2000);
+      }
+    },
+  ];
+
+  let phaseIdx = 0;
+  let phaseStart = performance.now();
+
+  function runPhase() {
+    if (phaseIdx >= phases.length) {
+      isFlying = false;
+      setPhase('飞行结束 | 鼠标自由探索');
+      updateCam();
+      return;
+    }
+    const phase = phases[phaseIdx];
+    const elapsed = performance.now() - phaseStart;
+    const t = Math.min(elapsed / phase.duration, 1);
+    phase.update(t);
+    if (t >= 1) {
+      phaseIdx++;
+      phaseStart = performance.now();
+      if (phaseIdx < phases.length) phases[phaseIdx].init();
+    }
+    requestAnimationFrame(runPhase);
+  }
+
+  phases[0].init();
+  runPhase();
+};
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (starField) starField.rotation.y += 0.0001;
+  if (earth) earth.rotation.y += 0.001;
+  renderer.render(scene, camera);
+}
+
+// 保存pathData供飞行动画用
+let pathData = null;
+fetch('path.json').then(r => r.json()).then(d => { pathData = d; window._pathData = d; });
+
+init().catch(err => {
+  document.getElementById('loading').textContent = '加载失败: ' + err.message;
+  console.error(err);
+});
+</script>
+</body>
+</html>

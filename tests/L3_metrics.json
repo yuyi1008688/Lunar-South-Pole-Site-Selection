@@ -1,0 +1,28 @@
+{
+  "交付剖面（双线性）": {
+    "stats": {
+      "min_soc": 210.8,
+      "dwell": 3,
+      "lunar": 5
+    },
+    "engineering_verdict": true,
+    "min_soc_ok": true,
+    "dwell_ok": false,
+    "lunar_ok": false
+  },
+  "最近邻敏感性变体": {
+    "stats": {
+      "min_soc": 200.3,
+      "dwell": 7,
+      "lunar": 6
+    },
+    "engineering_verdict": true,
+    "min_soc_ok": false,
+    "dwell_ok": true,
+    "lunar_ok": false
+  },
+  "failures": [
+    "交付剖面（双线性）-驻留充电次数",
+    "交付剖面（双线性）-单程月昼数"
+  ]
+}

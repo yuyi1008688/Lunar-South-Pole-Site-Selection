@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# 大数据文件一律不入库（获取方式见 data/README.md）
+*.tif
+*.tiff
+*.img
+*.jp2
+*.udbx
+*.smwu
+!gpa_model/GPA.smwu
+*.dat
+*.lbl
+*.tab
+*.xlsx
+*.xls
+*.shp
+*.dbf
+*.shx
+*.mp4
+
+# 但保留随仓库分发的例外
+!src/ch08_digital_twin/ThreeJS_scene/*.json
+!src/ch08_digital_twin/ThreeJS_scene/*.png
+!src/ch08_digital_twin/ThreeJS_scene/*.html
+!src/ch03_water_ice/wang2025_code/**/*.pkl
+
+# 分析产物输出（可由纯 Python 分析链重新生成）
+data/output/
+
+# 临时与系统文件
+Thumbs.db
+.DS_Store
+*.tmp
+*.log
