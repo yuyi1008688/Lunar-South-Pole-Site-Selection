@@ -1,4 +1,4 @@
-# ===== 通用数据处理与可视化 =====
+# ===== 主分析链依赖（Ch01–Ch06 + L0–L5 复现验证，纯 Python，无任何商业 GIS）=====
 numpy>=1.24.0
 pandas>=2.0.0
 scipy>=1.10.0
@@ -7,22 +7,12 @@ seaborn>=0.13.0
 shapely>=2.0.0
 pyproj>=3.6.0
 tqdm>=4.65.0
-
-# ===== 栅格 / 矢量 GIS =====
-rasterio>=1.3.0          # 底层即 GDAL，无需单列 GDAL 命令行依赖
+# 栅格/矢量 GIS（rasterio 底层即 GDAL，无需另装 GDAL 命令行）
+rasterio>=1.3.0
 geopandas>=0.14.0
-# 注：src/ch04_safety/VectorToHazard_main.py（历史留档工具，主链不调用）
-#     如需单独运行另装 GDAL(osgeo)；主分析链不需要。
-
-# ===== 深度学习（Ch03 冰点识别训练） =====
-tensorflow>=2.13.0
 scikit-learn>=1.3.0
 
-# ===== 三维可视化（Ch08 数字孪生） =====
-pyvista>=0.42.0
-vtk>=9.2.0
-PyQt5>=5.15.0
-
-# ===== 注 =====
-# 本项目不依赖任何商业 GIS 软件：主分析链（含 LCP 寻路、B 样条平滑、
-# 能量仿真与四级精度验证）全部由上述开源栈实现。
+# ===== 可选依赖不在本文件 =====
+# Ch03 Wang2025 模型训练(tensorflow)、Ch08 三维 GUI(pyvista/vtk/PyQt5)
+# 及历史留档工具 VectorToHazard_main 所需 GDAL(osgeo) 均非主链需要，
+# 如需请另行：pip install -r requirements-optional.txt

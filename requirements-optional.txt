@@ -1,0 +1,10 @@
+# 可选依赖——主分析链（Ch01–Ch06、L0–L5 复现验证）不需要以下任何包
+# 安装：pip install -r requirements-optional.txt
+
+# Ch03 Wang2025 深度学习冰识别模型训练（主链直接使用其公开冰点成果，无需训练）
+tensorflow>=2.13.0
+
+# Ch08 数字孪生：PyVista 离屏渲染 6 视角 / 360 GIF、体元可视化平台（浏览器 Three.js 场景无需这些）
+pyvista>=0.42.0
+vtk>=9.2.0
+PyQt5>=5.15.0

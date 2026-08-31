@@ -8,14 +8,32 @@
 
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![纯Python分析链](https://img.shields.io/badge/%E5%88%86%E6%9E%90%E9%93%BE-%E7%BA%AFPython-success)
-![L0--L4验证](https://img.shields.io/badge/L0--L4%E9%AA%8C%E8%AF%81-PASS-brightgreen)
+![L0--L5复现验证](https://img.shields.io/badge/L0--L5%E5%A4%8D%E7%8E%B0%E9%AA%8C%E8%AF%81-PASS-brightgreen)
 ![SuperMap杯参赛作品](https://img.shields.io/badge/SuperMap%E6%9D%AF-%E5%8F%82%E8%B5%9B%E4%BD%9C%E5%93%81-gold)
-![License GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-green)
+![License MIT](https://img.shields.io/badge/License-MIT-blue)
 
 ![AHP-WLC 选址适宜性](results/maps/07_AHP-WLC选址适宜性等级分布.png)
 
 **第二十四届 SuperMap 杯高校 GIS 大赛 · 分析组 · 参赛作品**
-yuyi（队长 · 总体设计与全流程实现）｜ 团队成员与指导教师（详见论文正式署名）
+**队长（GitHub: [yuyi1008688](https://github.com/yuyi1008688)）**：总体设计、方法论与全流程实现、纯 Python 解耦复现 ｜ 参赛队友协同完成（光照分类、安全势场、数据预处理与成果制作）｜ 正式署名以竞赛论文为准
+
+### 复现精度速览（纯 Python vs 当年商业软件存档，L0–L5 全部 PASS）
+
+| 层级 | 验证内容 | 结果 |
+| --- | --- | --- |
+| L0 数据层 | udbx→GeoTIFF 提取回环 | 35/35 栅格逐像元 100% 相等 |
+| L1 算子层 | 自实现 Dijkstra 对比原 LCP | 累积面 Pearson=1.0、路径像元 247/247 重合 |
+| L2 路径层 | 路径指标对表 | 4.029 km（基准 4.039，−0.26%）·17 顶点·危险穿越 0 |
+| L3 能量层 | 三态能量仿真 | 最低 SoC 210.8 Wh（>200），工程结论一致 |
+| L4 参数层 | 权重/公式/断点/FoS 对账 | WLC 差 3.3e-16、FoS 25/25 精确复现 |
+| L5 全链层 | Ch02/Ch05 逐像元对标 | F1 差 2.97e-8、适宜性差 3.95e-8、分类一致率 100%、站址 (44760,10920) |
+
+```bash
+pip install -r requirements.txt
+python examples/run_pipeline.py --all     # 端到端约 20 秒
+python tests/L5_verify_ch02_ch05.py       # 逐像元复现验证
+```
+
 
 ---
 
@@ -130,12 +148,12 @@ flowchart TB
 1. **地外行星 GIS 选址** —— 完整方法链落在月球南极（EPSG:104903 月球南极立体投影），从原始 PDS 数据到交互式数字孪生端到端打通，而非单一要素分析。
 2. **Wang KDE 水冰丰度估计（核心算法）** —— 放弃预测力不足的克里金方案（LOOCV R²=0.229），直接以 Wang et al. (2025, Icarus) 深度学习 M³ 冰识别的 **5,031 个实测冰点**做各向异性高斯核密度估计（bw_method=0.11，σ_x≈1,290 m / σ_y≈1,872 m），叠加 sPSR/subPSR 分级降权与 P98 归一化，并通过带宽稳健性、Moran's I、LPNS 氢一致性、纬度分布四项独立验证。
 3. **全流程纯 Python 可复现** —— Ch01–Ch06 **全部环节**不依赖任何商业 GIS 软件：`src/utils/udbx_extract.py` 直接从 SQLite 格式数据源解放栅格（逐像元 100% 回环），LCP 为自实现 8 邻域 Dijkstra（与原产出累积面误差 ULP 级），B 样条为 scipy splprep，**Ch02 光照分类与 Ch05 AHP-WLC 成图亦已补写为纯 Python 并与存档逐像元一致（L5）**；`python examples/run_pipeline.py --all` 一键端到端（14 阶段约 20 秒）。竞赛期的处理自动化工作流（50 步）在 `gpa_model/` 作为工程化封装留档。
-4. **Three.js 数字孪生（可直接浏览器打开）** —— `src/ch08_digital_twin/ThreeJS_scene/index.html` 双击即可交互浏览：融合 DEM 三维地形、PSR 覆盖、地下水分冰体元、5,214 个Ⅰ级选址点、最优巡视路径与 8 阶段飞行漫游动画。
+4. **Three.js 数字孪生（可直接浏览器打开）** —— `src/ch08_digital_twin/ThreeJS_scene/index.html` 双击即可交互浏览：融合 DEM 三维地形、PSR 覆盖、地下水分冰体元、16,022 个Ⅰ级最优选址像元、最优巡视路径与 8 阶段飞行漫游动画。
 5. **六因子→五因子 AHP-WLC 多准则决策 + 不确定性量化** —— 判断矩阵每个元素以嫦娥七号工程约束层级（生存层/任务层/保障层）为依据（CR=0.54%），WLC 加权叠加 + Jenks 分级输出站址；1,000 次 Dirichlet 蒙特卡洛验证权重稳健性，另含 FoS 25 组参数敏感性扫描与 ECSA 独立性诊断。
 
 ## 团队与贡献
 
-本项目以团队协作完成（队长总体设计、按章节分工执行，各成员贡献以论文正式署名为准）。本开源仓库由队长 **yuyi**（GitHub: [yuyi1008688](https://github.com/yuyi1008688)）维护，负责全流程集成联调、端到端验证与本纯 Python 解耦版的发布。
+本项目由参赛团队协作完成：**队长（GitHub: [yuyi1008688](https://github.com/yuyi1008688)）**负责总体设计、方法论构建、Ch03 水冰 / Ch05 选址 / Ch06 路径与能量主体、全流程集成联调、L0–L5 复现验证与纯 Python 解耦版发布；**参赛队友**按章节分工协同完成光照分类、安全势场、数据预处理与成果制作。为保护隐私，本仓库不公开成员与指导教师真实姓名，正式署名以竞赛论文为准。开源仓库由队长维护。
 
 > 章节分工概览：Ch02/Ch03/Ch05（光照·水冰·选址）、Ch04（安全势场）、Ch06（路径与能量）、Ch08（数字孪生）。
 
@@ -174,12 +192,14 @@ python tests/L5_verify_ch02_ch05.py && python tests/L5_verify_endtoend.py
 ```
 Lunar-South-Pole-Site-Selection/
 ├── README.md                        # 本文件
-├── LICENSE                          # GPL-3.0
-├── requirements.txt                 # Python 依赖清单
+├── LICENSE                          # MIT
+├── requirements.txt                 # 主分析链依赖（轻量）
+├── requirements-optional.txt          # 可选依赖（Ch03训练/Ch08三维GUI）
 ├── docs/
 │   ├── methodology.md               # 技术方法详解（九章浓缩 + 参数表）
 │   ├── results.md                   # 成果展示与关键数字
-│   └── quickstart.md                # 快速上手指南（三级体验）
+│   ├── quickstart.md                # 快速上手指南（三级体验）
+│   └── 解耦变更说明.md                # 纯Python重构逐文件变更与等价性
 ├── src/                             # 章节代码（主分析链纯 Python）
 │   ├── ch01_data_foundation/        #   山体阴影等
 │   ├── ch02_illumination/           #   ★ 光照分类纯 Python（双PSR/五级/F1，L5 对标 100%）
@@ -190,11 +210,12 @@ Lunar-South-Pole-Site-Selection/
 │   ├── ch06_path_planning/          #   ★ 纯 Python 主链：定标→验证→Dijkstra LCP→B样条→能量
 │   ├── ch08_digital_twin/           #   PyVista 渲染 + 体元平台 + Three.js 场景
 │   └── utils/                       #   udbx_extract / raster_grid / iron_grid 断言 / 铁基准对齐
-├── tests/                           # ★ 四级精度验证（可重复运行）
+├── tests/                           # ★ 六级精度验证 L0–L5（可重复运行）
 │   ├── L0_verify_extract.py         #   数据层：提取回环 100%
 │   ├── L1_verify_lcp.py             #   算子层：Dijkstra vs 原产出（ULP 级一致）
 │   ├── L2_verify_path_metrics.py    #   路径层：长度/绕路/穿越/剖面
-│   ├── L3_verify_energy.py          #   端到端：能量仿真结论
+│   ├── L3_verify_energy.py          #   能量层：三态能量仿真结论
+│   ├── L4_verify_params_sensitivity.py #  参数层：WLC/F1/Jenks/FoS 对账
 │   ├── L5_verify_ch02_ch05.py       #   Ch02/Ch05 逐像元对标 + 端到端验收
 │   └── 解耦与精度验证报告.md          #   汇总报告（数字/容差/PASS-FAIL/对比图）
 ├── examples/
@@ -228,7 +249,7 @@ Lunar-South-Pole-Site-Selection/
 
 **无需安装任何环境**：用 Chrome / Edge 直接打开 `src/ch08_digital_twin/ThreeJS_scene/index.html`。
 
-- 场景内容：融合 DEM 三维地形（高程夸张 ×3）、光照分类叠加、PSR 半透明覆盖、地下水分冰体元、5,214 个Ⅰ级选址点（按得分着色）、最优巡视路径、地球远景与星空。
+- 场景内容：融合 DEM 三维地形（高程夸张 ×3）、光照分类叠加、PSR 半透明覆盖、地下水分冰体元、Ⅰ级最优选址点群（按得分着色）、最优巡视路径、地球远景与星空。
 - 交互：鼠标拖拽旋转、滚轮缩放；点击右上角"开始飞行漫游"观看 8 阶段动画（火箭起飞 → 飞向月球 → 入轨 → 俯瞰地形 → 发现水冰 → 选址点群 → 巡视路径 → 拉远收尾）。
 - 数据：同目录 `dem.json`（384×384 高程）、`points.json`、`path.json`、`ice_voxels.json` 与 3 张纹理，全部由第 2–6 章分析成果导出，可追溯到具体章节产出。
 - 本项目语境下的"数字孪生"指任务规划阶段（pre-mission）的静态多源数据融合与交互式决策仿真系统，区别于工业界实时监测反馈型数字孪生。
@@ -248,20 +269,22 @@ Lunar-South-Pole-Site-Selection/
 ## 方法论文档
 
 - [docs/methodology.md](docs/methodology.md) —— 九章技术方法详解：数据底座、双 PSR 分类、Wang KDE、LESF 势场（FoS/ECSA/F5）、AHP-WLC、路径与能量仿真、工程封装、数字孪生，含全部关键参数表与修正记录。
-- [tests/解耦与精度验证报告.md](tests/解耦与精度验证报告.md) —— 纯 Python 解耦重构的四级验证报告（L0 数据层 / L1 算子层 / L2 路径层 / L3 端到端），每项验证含数字、容差与 PASS/FAIL 结论。
+- [tests/解耦与精度验证报告.md](tests/解耦与精度验证报告.md) —— 纯 Python 解耦重构的六级验证报告（L0 数据层 / L1 算子层 / L2 路径层 / L3 能量层 / L4 参数层 / L5 全链对标），每项验证含数字、容差与 PASS/FAIL 结论。
 
 ## 引用
 
-如本仓库对你的研究或学习有帮助，请引用：
+如本仓库对你的研究或学习有帮助，请引用（正式投稿建议先在 GitHub 打 Release tag、由 Zenodo（zenodo.org）归档获得永久 DOI，再把 url 替换为 doi）：
 
 ```bibtex
 @misc{lunar_south_pole_site_selection_2026,
   title  = {Lunar South Pole Shackleton Crater Research Station Site Selection:
             Multi-Criteria Spatial Decision Analysis and Digital Twin Simulation},
-  author = {yuyi and contributors},
+  author = {yuyi and team members},
   year   = {2026},
   howpublished = {24th SuperMap Cup National College GIS Competition (Analysis Track)},
-  note   = {\url{https://github.com/<your-username>/Lunar-South-Pole-Site-Selection}}
+  url     = {https://github.com/yuyi1008688/Lunar-South-Pole-Site-Selection},
+  version = {v2.0},
+  % 正式投稿时改用 Zenodo 归档：doi = {10.5281/zenodo.XXXXXXX}
 }
 ```
 
@@ -275,9 +298,9 @@ Lunar-South-Pole-Site-Selection/
 
 ## License
 
-代码与文档以 [GPL-3.0](LICENSE) 协议开源：任何二次分发或衍生作品须以同一协议开源并保留署名。
+代码与文档以 [MIT](LICENSE) 协议开源：允许自由使用、复制、修改与再分发（含商业用途），唯须保留原始版权声明与许可声明。
 
-Copyright (C) 2026 yuyi (GitHub: yuyi1008688) 及贡献者
+Copyright (c) 2026 yuyi (GitHub: yuyi1008688) 及参赛队友
 
 成果图件仅供展示引用。原始数据版权归各数据发布机构所有，请遵循各自的使用条款（NASA PDS 数据面向公众开放）。
 
